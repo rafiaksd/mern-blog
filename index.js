@@ -44,18 +44,23 @@ app.post('/register', async (req, res)=>{
 })
 
 app.post('/login', async (req, res) => {
-     const { username, password } = req.body;
-     const userDoc = await User.findOne({ username });
-   
-     if (!userDoc || !bcrypt.compareSync(password, userDoc.password)) {
-       return res.status(400).json('Incorrect credentials');
-     }
-   
-     jwt.sign({ username, id: userDoc._id }, jwtSecret, {}, (err, token) => {
-       if (err) throw err;
-       res.cookie('token', token).json({ id: userDoc._id, username });
-     });
-   });
+  const { username, password } = req.body;
+  const userDoc = await User.findOne({ username });
+
+  if (!userDoc || !bcrypt.compareSync(password, userDoc.password)) {
+    return res.status(400).json('Incorrect credentials');
+  }
+
+  jwt.sign({ username, id: userDoc._id }, jwtSecret, {}, (err, token) => {
+    if (err) throw err;
+    res.cookie('token', token, { httpOnly: true }).json({
+      id: userDoc._id,
+      username,
+      token // Include the token in the response
+    });
+  });
+});
+
    
 
 app.get('/profile', (req, res)=>{

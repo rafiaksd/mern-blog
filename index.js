@@ -1,0 +1,130 @@
+const express = require('express')
+const cors = require('cors')
+const app = express()
+
+const mongoose = require('mongoose')
+const User = require('./models/user.js')
+const Post = require('./models/post.js')
+
+const bcrypt = require('bcryptjs')
+const jwt = require('jsonwebtoken')
+const cookieParser = require('cookie-parser')
+
+require('dotenv').config();
+
+const salt = bcrypt.genSaltSync(10)
+const mongoURI = process.env.MONGO_CONNECT_URI;
+const jwtSecret = process.env.JWT_SECRET
+const PORT = process.env.PORT
+
+const corsOptions = {
+     credentials: true,
+     origin: process.env.NODE_ENV === 'production' 
+       ? 'https://rafiaksd.github.io'  // Production URL
+       : 'http://localhost:5173',            // Local development URL
+   };
+   
+app.use(cors(corsOptions));
+app.use(express.json())
+app.use(cookieParser())
+
+mongoose.connect(mongoURI)
+
+app.post('/register', async (req, res)=>{
+     const {username, password} = req.body;
+     try{
+          const userDoc = await User.create({username: username, password: bcrypt.hashSync(password, salt),})
+          res.json(userDoc)
+     } catch (e){
+          console.log('exception: ', e)
+          res.status(400).json(e)
+     }
+})
+
+app.post('/login', async (req, res) => {
+     const { username, password } = req.body;
+     const userDoc = await User.findOne({ username });
+   
+     if (!userDoc || !bcrypt.compareSync(password, userDoc.password)) {
+       return res.status(400).json('Incorrect credentials');
+     }
+   
+     jwt.sign({ username, id: userDoc._id }, jwtSecret, {}, (err, token) => {
+       if (err) throw err;
+       res.cookie('token', token).json({ id: userDoc._id, username });
+     });
+   });
+   
+
+app.get('/profile', (req, res)=>{
+     const {token} = req.cookies
+     jwt.verify(token, jwtSecret, {}, (err, info)=>{
+          if (err) throw err;
+          res.json(info)
+     })
+})
+
+app.post('/logout', (req, res)=>{
+     res.cookie('token', '').json('logoutted')
+})
+
+
+app.post('/post', async (req, res)=>{
+     const {token} = req.cookies
+     jwt.verify(token, jwtSecret, {}, async (err, info)=>{
+          if (err) throw err;
+
+          const {title, summary, content} = req.body;
+
+          const postDoc = await Post.create({
+               title: title,
+               summary: summary,
+               content: content,
+               author: info.id,
+          })
+
+          res.json(postDoc)
+     })
+})
+
+app.put('/post', async (req, res) => {
+   
+     const { token } = req.cookies;
+     jwt.verify(token, jwtSecret, {}, async (err, info) => {
+       if (err) throw err;
+   
+       const { id, title, summary, content } = req.body;
+       const postDoc = await Post.findById(id);
+   
+       // Check if the logged-in user is the author of the post
+       const isAuthor = JSON.stringify(postDoc.author) === JSON.stringify(info.id);
+   
+       if (!isAuthor) {
+         return res.status(400).json('You are not the author!');
+       }
+   
+       // Update postDoc with the new data
+       postDoc.title = title || postDoc.title;
+       postDoc.summary = summary || postDoc.summary;
+       postDoc.content = content || postDoc.content;
+   
+       // Save the updated post
+       await postDoc.save();
+   
+       res.json(postDoc);  // Send back the updated post
+     });
+});
+   
+
+app.get('/post', async (req, res)=> {
+     const posts = await Post.find().populate('author', ['username']).sort({createdAt : -1}).limit(20)
+     res.json(posts)
+})
+
+app.get('/post/:id', async(req, res)=>{
+     const {id} = req.params
+     const postDoc = await Post.findById(id).populate('author', ['username'])
+     res.json(postDoc)
+})
+
+app.listen(PORT)

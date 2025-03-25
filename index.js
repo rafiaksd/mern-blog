@@ -2,15 +2,6 @@ const express = require('express')
 const cors = require('cors')
 const app = express()
 
-const corsOptions = {
-  origin: 'https://rafiaksd.github.io', // The GitHub Pages URL
-  methods: ['GET', 'POST', 'PUT', 'DELETE'], // Allowed methods
-  allowedHeaders: ['Content-Type', 'Authorization'], // Allow specific headers
-  credentials: true, // Allow cookies to be sent with requests
-};
-
-app.use(cors(corsOptions)); // Apply CORS middleware first
-
 const mongoose = require('mongoose')
 const User = require('./models/user.js')
 const Post = require('./models/post.js')
@@ -26,6 +17,13 @@ const mongoURI = process.env.MONGO_CONNECT_URI;
 const jwtSecret = process.env.JWT_SECRET
 
 const PORT = process.env.PORT
+
+const corsOptions = {
+  origin: 'https://rafiaksd.github.io', // The GitHub Pages URL
+  methods: ['GET', 'POST', 'PUT', 'DELETE'], // Allowed methods
+  credentials: true, // Allow cookies to be sent with requests
+};
+app.use(cors(corsOptions));
 
 app.use(express.json())
 app.use(cookieParser())
@@ -44,23 +42,18 @@ app.post('/register', async (req, res)=>{
 })
 
 app.post('/login', async (req, res) => {
-  const { username, password } = req.body;
-  const userDoc = await User.findOne({ username });
-
-  if (!userDoc || !bcrypt.compareSync(password, userDoc.password)) {
-    return res.status(400).json('Incorrect credentials');
-  }
-
-  jwt.sign({ username, id: userDoc._id }, jwtSecret, {}, (err, token) => {
-    if (err) throw err;
-    res.cookie('token', token, { httpOnly: true }).json({
-      id: userDoc._id,
-      username,
-      token // Include the token in the response
-    });
-  });
-});
-
+     const { username, password } = req.body;
+     const userDoc = await User.findOne({ username });
+   
+     if (!userDoc || !bcrypt.compareSync(password, userDoc.password)) {
+       return res.status(400).json('Incorrect credentials');
+     }
+   
+     jwt.sign({ username, id: userDoc._id }, jwtSecret, {}, (err, token) => {
+       if (err) throw err;
+       res.cookie('token', token).json({ id: userDoc._id, username });
+     });
+   });
    
 
 app.get('/profile', (req, res)=>{
@@ -76,31 +69,23 @@ app.post('/logout', (req, res)=>{
 })
 
 
-app.post('/post', async (req, res) => {
-  const token = req.headers.authorization?.split(' ')[1]; // Extract token from 'Authorization: Bearer <token>'
+app.post('/post', async (req, res)=>{
+     const {token} = req.cookies
+     jwt.verify(token, jwtSecret, {}, async (err, info)=>{
+          if (err) throw err;
 
-  if (!token) {
-    return res.status(401).json({ message: 'Token is required!!!' });
-  }
+          const {title, summary, content} = req.body;
 
-  jwt.verify(token, jwtSecret, {}, async (err, info) => {
-    if (err) {
-      return res.status(401).json({ message: 'Invalid token' });
-    }
+          const postDoc = await Post.create({
+               title: title,
+               summary: summary,
+               content: content,
+               author: info.id,
+          })
 
-    const { title, summary, content } = req.body;
-
-    const postDoc = await Post.create({
-      title: title,
-      summary: summary,
-      content: content,
-      author: info.id,
-    });
-
-    res.json(postDoc);
-  });
-});
-
+          res.json(postDoc)
+     })
+})
 
 app.put('/post', async (req, res) => {
    

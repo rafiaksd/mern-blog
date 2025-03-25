@@ -71,23 +71,31 @@ app.post('/logout', (req, res)=>{
 })
 
 
-app.post('/post', async (req, res)=>{
-     const {token} = req.cookies
-     jwt.verify(token, jwtSecret, {}, async (err, info)=>{
-          if (err) throw err;
+app.post('/post', async (req, res) => {
+  const token = req.headers.authorization?.split(' ')[1]; // Extract token from 'Authorization: Bearer <token>'
 
-          const {title, summary, content} = req.body;
+  if (!token) {
+    return res.status(401).json({ message: 'Token is required!!!' });
+  }
 
-          const postDoc = await Post.create({
-               title: title,
-               summary: summary,
-               content: content,
-               author: info.id,
-          })
+  jwt.verify(token, jwtSecret, {}, async (err, info) => {
+    if (err) {
+      return res.status(401).json({ message: 'Invalid token' });
+    }
 
-          res.json(postDoc)
-     })
-})
+    const { title, summary, content } = req.body;
+
+    const postDoc = await Post.create({
+      title: title,
+      summary: summary,
+      content: content,
+      author: info.id,
+    });
+
+    res.json(postDoc);
+  });
+});
+
 
 app.put('/post', async (req, res) => {
    

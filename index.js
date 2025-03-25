@@ -2,6 +2,15 @@ const express = require('express')
 const cors = require('cors')
 const app = express()
 
+const corsOptions = {
+  origin: 'https://rafiaksd.github.io', // The GitHub Pages URL
+  methods: ['GET', 'POST', 'PUT', 'DELETE'], // Allowed methods
+  allowedHeaders: ['Content-Type', 'Authorization'], // Allow specific headers
+  credentials: true, // Allow cookies to be sent with requests
+};
+
+app.use(cors(corsOptions)); // Apply CORS middleware first
+
 const mongoose = require('mongoose')
 const User = require('./models/user.js')
 const Post = require('./models/post.js')
@@ -17,13 +26,6 @@ const mongoURI = process.env.MONGO_CONNECT_URI;
 const jwtSecret = process.env.JWT_SECRET
 
 const PORT = process.env.PORT
-
-const corsOptions = {
-  origin: 'https://rafiaksd.github.io', // The GitHub Pages URL
-  methods: ['GET', 'POST', 'PUT', 'DELETE'], // Allowed methods
-  credentials: true, // Allow cookies to be sent with requests
-};
-app.use(cors(corsOptions));
 
 app.use(express.json())
 app.use(cookieParser())
